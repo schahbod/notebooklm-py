@@ -9,11 +9,14 @@ per-command listing is the ``source`` click group docstring below.
 """
 
 import asyncio  # noqa: F401 — re-exported for regression tests that patch source_cmd.asyncio.sleep
+import os
+from pathlib import Path
 from typing import Any
 
 import click
 
 from .._app import source_add as source_add_service
+from .._app.errors import classify
 from .._app.source_add import SourceAddExecutionPlan, execute_source_add
 from .._app.source_clean import (
     SourceCleanResult,
@@ -120,6 +123,7 @@ def source():
     Commands:
       list             List sources in a notebook
       add              Add a source (url, text, file, youtube)
+        add-folder       Add all regular files from a folder recursively
       add-drive        Add a Google Drive document (native Docs/Slides/Sheets + PDF)
       add-drive-file   Add an upload-only Drive file (epub/docx/txt/...) via download
       add-research     Search web/drive and add sources from results
@@ -335,6 +339,200 @@ def source_add(
             with cli_status(f"Adding {plan.detected_type} source...", ctx=ctx):
                 result = await execute_source_add(client, execution_plan)
             cli_print(f"[green]Added source:[/green] {result.source.id}", ctx=ctx)
+
+    return _run()
+
+
+def _format_progress_bar(done: int, total: int, *, width: int = 20) -> str:
+    """Render a fixed-width progress bar using block characters."""
+    if total <= 0:
+        filled = 0
+    else:
+        filled = min(width, int((done / total) * width))
+    return ("█" * filled) + ("░" * (width - filled))
+
+
+def _collect_upload_files(folder: Path, *, follow_symlinks: bool) -> tuple[list[Path], list[Path]]:
+    """Collect regular files under a folder and track skipped paths."""
+    files: list[Path] = []
+    skipped: list[Path] = []
+
+    for root, dirnames, filenames in os.walk(folder, followlinks=follow_symlinks):
+        root_path = Path(root)
+
+        if not follow_symlinks:
+            keep_dirs: list[str] = []
+            for dirname in dirnames:
+                candidate = root_path / dirname
+                if candidate.is_symlink():
+                    skipped.append(candidate)
+                    continue
+                keep_dirs.append(dirname)
+            dirnames[:] = keep_dirs
+
+        for filename in filenames:
+            candidate = root_path / filename
+            if not follow_symlinks and candidate.is_symlink():
+                skipped.append(candidate)
+                continue
+            if candidate.is_file():
+                files.append(candidate)
+            else:
+                skipped.append(candidate)
+
+    files.sort(key=lambda p: str(p).lower())
+    skipped.sort(key=lambda p: str(p).lower())
+    return files, skipped
+
+
+async def _with_transient_retry(
+    operation,
+    *,
+    max_retries: int,
+    on_retry=None,
+):
+    """Retry transient failures with exponential backoff (1s, 2s, 4s, ...)."""
+    attempt = 0
+    while True:
+        try:
+            return await operation()
+        except Exception as exc:
+            classified = classify(exc)
+            if attempt >= max_retries or not classified.retriable:
+                raise
+            delay = float(2**attempt)
+            if on_retry is not None:
+                on_retry(attempt + 1, delay, exc)
+            await asyncio.sleep(delay)
+            attempt += 1
+
+
+@source.command("add-folder")
+@click.argument("folder_path", type=click.Path(path_type=Path))
+@notebook_option
+@click.option(
+    "--request-timeout",
+    "--timeout",
+    "timeout",
+    default=None,
+    type=float,
+    help=(
+        "HTTP request timeout in seconds (default: 30, from the library). "
+        "(--timeout is a back-compat alias.)"
+    ),
+)
+@click.option(
+    "--follow-symlinks",
+    is_flag=True,
+    default=False,
+    help=(
+        "Follow symbolic links while scanning. By default, symlink files and "
+        "symlinked directories are skipped."
+    ),
+)
+@click.option(
+    "--retry",
+    "max_retries",
+    default=3,
+    type=click.IntRange(min=0),
+    show_default=True,
+    help="Retries per file for transient failures (exponential backoff).",
+)
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+@with_client
+def source_add_folder(
+    ctx,
+    folder_path,
+    notebook_id,
+    timeout,
+    follow_symlinks,
+    max_retries,
+    json_output,
+    client_auth,
+):
+    """Add all regular files from a folder recursively."""
+    nb_id = require_notebook(notebook_id)
+    folder = folder_path.expanduser().resolve()
+    if not folder.exists() or not folder.is_dir():
+        _output_error(f"Error: Not a directory: {folder_path}", "VALIDATION_ERROR", json_output, 1)
+        raise AssertionError("unreachable") from None  # pragma: no cover
+
+    client_kwargs: dict = {"timeout": timeout} if timeout is not None else {}
+
+    async def _run():
+        async with resolve_client_factory(ctx)(client_auth, **client_kwargs) as client:
+            nb_id_resolved = await resolve_notebook_id(client, nb_id, json_output=json_output)
+
+            if not json_output:
+                cli_print(f"Scanning {folder}...", ctx=ctx)
+            files, skipped_paths = _collect_upload_files(folder, follow_symlinks=follow_symlinks)
+
+            total = len(files)
+            completed: list[dict[str, str]] = []
+            failed: list[dict[str, str]] = []
+
+            if not json_output:
+                cli_print(f"Found {total} files", ctx=ctx)
+                cli_print("", ctx=ctx)
+                cli_print("Uploading:", ctx=ctx)
+                if total > 0:
+                    cli_print(f"[{_format_progress_bar(0, total)}] 0/{total}", ctx=ctx)
+
+            for idx, file_path in enumerate(files, start=1):
+                try:
+                    source = await _with_transient_retry(
+                        lambda fp=file_path: client.sources.add_file(nb_id_resolved, str(fp.resolve())),
+                        max_retries=max_retries,
+                        on_retry=(
+                            lambda attempt, delay, exc, fp=file_path: cli_print(
+                                (
+                                    f"[yellow]Request failed for {fp.name}: {exc}. "
+                                    f"Retrying in {int(delay)} second(s) "
+                                    f"({attempt}/{max_retries})[/yellow]"
+                                ),
+                                ctx=ctx,
+                            )
+                            if not json_output
+                            else None
+                        ),
+                    )
+                except Exception as exc:
+                    rel_name = str(file_path.relative_to(folder))
+                    failed.append({"path": rel_name, "error": str(exc)})
+                    if not json_output:
+                        cli_print(f"[{_format_progress_bar(idx, total)}] {idx}/{total}", ctx=ctx)
+                        cli_print(f"[red]✗ {rel_name}[/red]", ctx=ctx)
+                    continue
+
+                rel_name = str(file_path.relative_to(folder))
+                completed.append({"id": source.id, "path": rel_name})
+                if not json_output:
+                    cli_print(f"[{_format_progress_bar(idx, total)}] {idx}/{total}", ctx=ctx)
+                    cli_print(f"[green]✓ {rel_name}[/green]", ctx=ctx)
+
+            summary = {
+                "action": "add-folder",
+                "notebook_id": nb_id_resolved,
+                "folder": str(folder),
+                "total": total,
+                "completed_count": len(completed),
+                "failed_count": len(failed),
+                "skipped_count": len(skipped_paths),
+                "completed": completed,
+                "failed": failed,
+                "skipped": [str(path.relative_to(folder)) for path in skipped_paths],
+            }
+
+            if json_output:
+                json_output_response(summary)
+            else:
+                cli_print("", ctx=ctx)
+                cli_print(f"Completed: {summary['completed_count']}", ctx=ctx)
+                cli_print(f"Failed:     {summary['failed_count']}", ctx=ctx)
+                cli_print(f"Skipped:    {summary['skipped_count']}", ctx=ctx)
+
+            if failed:
+                exit_with_code(1)
 
     return _run()
 

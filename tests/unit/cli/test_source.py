@@ -11,7 +11,7 @@ from click.testing import CliRunner
 
 import notebooklm.auth as auth_module
 from notebooklm.cli import helpers as helpers_module
-from notebooklm.exceptions import ValidationError
+from notebooklm.exceptions import NetworkError, ValidationError
 from notebooklm.notebooklm_cli import cli
 from notebooklm.types import (
     DriveSourceStatus,
@@ -820,6 +820,96 @@ class TestSourceAdd:
 
         assert result.exit_code == 0
         assert "timeout" not in client_calls[-1][1]
+
+    def test_source_add_folder_progress_and_summary(self, runner, mock_auth, tmp_path):
+        folder = tmp_path / "documents"
+        folder.mkdir()
+        (folder / "postgres.pdf").write_bytes(b"pdf-1")
+        (folder / "citus.pdf").write_bytes(b"pdf-2")
+
+        mock_client = create_mock_client()
+        mock_client.sources.add_file = AsyncMock(
+            side_effect=[
+                Source(id="src_1", title="postgres.pdf"),
+                Source(id="src_2", title="citus.pdf"),
+            ]
+        )
+
+        with patch.object(
+            auth_module, "fetch_tokens_with_domains", new_callable=AsyncMock
+        ) as mock_fetch:
+            mock_fetch.return_value = ("csrf", "session")
+            result = runner.invoke(
+                cli,
+                ["source", "add-folder", str(folder), "-n", "nb_123"],
+                obj=inject_client(mock_client),
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "Scanning" in result.output
+        assert "Found 2 files" in result.output
+        assert "Uploading:" in result.output
+        assert "2/2" in result.output
+        assert "Completed: 2" in result.output
+        assert "Failed:     0" in result.output
+        assert "Skipped:    0" in result.output
+        assert mock_client.sources.add_file.await_count == 2
+
+    def test_source_add_folder_retries_transient_failures(self, runner, mock_auth, tmp_path):
+        folder = tmp_path / "documents"
+        folder.mkdir()
+        file_path = folder / "airflow.pdf"
+        file_path.write_bytes(b"pdf")
+
+        mock_client = create_mock_client()
+        mock_client.sources.add_file = AsyncMock(
+            side_effect=[
+                NetworkError("temporary network error"),
+                Source(id="src_ok", title="airflow.pdf"),
+            ]
+        )
+
+        with (
+            patch.object(auth_module, "fetch_tokens_with_domains", new_callable=AsyncMock) as mock_fetch,
+            patch.object(source_module.asyncio, "sleep", AsyncMock()) as sleep_mock,
+        ):
+            mock_fetch.return_value = ("csrf", "session")
+            result = runner.invoke(
+                cli,
+                ["source", "add-folder", str(folder), "-n", "nb_123", "--retry", "3"],
+                obj=inject_client(mock_client),
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "Retrying in 1 second(s) (1/3)" in result.output
+        sleep_mock.assert_awaited_once_with(1.0)
+        assert mock_client.sources.add_file.await_count == 2
+
+    def test_source_add_folder_non_retriable_failure_is_reported(self, runner, mock_auth, tmp_path):
+        folder = tmp_path / "documents"
+        folder.mkdir()
+        (folder / "broken.pdf").write_bytes(b"pdf")
+
+        mock_client = create_mock_client()
+        mock_client.sources.add_file = AsyncMock(side_effect=ValidationError("bad input"))
+
+        with (
+            patch.object(auth_module, "fetch_tokens_with_domains", new_callable=AsyncMock) as mock_fetch,
+            patch.object(source_module.asyncio, "sleep", AsyncMock()) as sleep_mock,
+        ):
+            mock_fetch.return_value = ("csrf", "session")
+            result = runner.invoke(
+                cli,
+                ["source", "add-folder", str(folder), "-n", "nb_123", "--retry", "3"],
+                obj=inject_client(mock_client),
+            )
+
+        assert result.exit_code == 1, result.output
+        assert "✗ broken.pdf" in result.output
+        assert "Completed: 0" in result.output
+        assert "Failed:     1" in result.output
+        assert "Skipped:    0" in result.output
+        sleep_mock.assert_not_called()
 
 
 # =============================================================================

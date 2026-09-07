@@ -1,0 +1,299 @@
+{
+  "title": "MQTT Quiz",
+  "language": "de",
+  "version": "2.0",
+  "topic": "MQTT",
+  "estimatedTimeMinutes": 10,
+  "questions": [
+    {
+      "id": "mqtt-001",
+      "difficulty": "easy",
+      "question": "Was beschreibt das im MQTT-Protokoll genutzte Publish-Subscribe-Muster am besten?",
+      "hint": "Achte darauf, wie Sender und Empfaenger entkoppelt werden.",
+      "answerOptions": [
+        {
+          "text": "Sender und Empfaenger kommunizieren direkt miteinander, ohne eine Zwischeninstanz.",
+          "isCorrect": false,
+          "rationale": "Das waere eine Punkt-zu-Punkt-Kommunikation; MQTT nutzt stattdessen den Broker als Vermittler."
+        },
+        {
+          "text": "Daten werden vom Absender an ein Topic gesendet und von Abonnenten dieses Topics empfangen.",
+          "isCorrect": true,
+          "rationale": "Genau das ist Publish/Subscribe: Publisher senden an Topics, Subscriber empfangen ueber Abos."
+        },
+        {
+          "text": "Ein Client fordert Daten aktiv von einem Server an, der sofort antwortet.",
+          "isCorrect": false,
+          "rationale": "Das ist Request/Response, wie z. B. bei HTTP, nicht das typische MQTT-Muster."
+        },
+        {
+          "text": "Alle Daten werden permanent an alle Teilnehmer im Netzwerk gesendet.",
+          "isCorrect": false,
+          "rationale": "Das waere Broadcast; MQTT verteilt selektiv nach Topic-Abonnements."
+        }
+      ],
+      "explanationShort": "MQTT entkoppelt Publisher und Subscriber ueber Topics und den Broker."
+    },
+    {
+      "id": "mqtt-002",
+      "difficulty": "easy",
+      "question": "Welche Funktion uebernimmt der Broker innerhalb einer MQTT-Architektur?",
+      "hint": "Denke an den Broker als zentrale Vermittlungsstelle.",
+      "answerOptions": [
+        {
+          "text": "Er visualisiert die Daten in einem Dashboard fuer Endnutzer.",
+          "isCorrect": false,
+          "rationale": "Visualisierung uebernehmen meist separate Anwendungen, nicht der Broker selbst."
+        },
+        {
+          "text": "Er empfaengt Nachrichten, filtert sie nach Topics und leitet sie an passende Subscriber weiter.",
+          "isCorrect": true,
+          "rationale": "Der Broker ist das Kommunikationszentrum im MQTT-System."
+        },
+        {
+          "text": "Er wandelt analoge Messwerte direkt in digitale MQTT-Nachrichten um.",
+          "isCorrect": false,
+          "rationale": "Diese Umwandlung passiert am Geraet bzw. in der Sensorlogik."
+        },
+        {
+          "text": "Er ist nur ein lokaler Langzeitspeicher fuer Sensordaten.",
+          "isCorrect": false,
+          "rationale": "Persistenz kann vorhanden sein, ist aber nicht die Kernaufgabe eines Brokers."
+        }
+      ],
+      "explanationShort": "Der Broker vermittelt zwischen Clients und verteilt Nachrichten topic-basiert."
+    },
+    {
+      "id": "mqtt-003",
+      "difficulty": "easy",
+      "question": "Welche Aussage zu MQTT-Topics ist korrekt?",
+      "hint": "Achte auf die hierarchische Struktur mit Schraegstrichen.",
+      "answerOptions": [
+        {
+          "text": "Topics sind beliebige IP-Adressen der Clients.",
+          "isCorrect": false,
+          "rationale": "Topics sind Namen fuer Nachrichtenkanaele, keine Netzwerkadressen."
+        },
+        {
+          "text": "Topics sind hierarchische Kanalnamen wie fabrik/linie1/temp, ueber die Nachrichten gefiltert werden.",
+          "isCorrect": true,
+          "rationale": "Die Topic-Hierarchie steuert, welche Subscriber welche Nachrichten bekommen."
+        },
+        {
+          "text": "Ein Topic darf nur aus genau einer Ebene bestehen.",
+          "isCorrect": false,
+          "rationale": "MQTT-Topics koennen mehrere Ebenen haben, getrennt durch /."
+        },
+        {
+          "text": "Topics werden nur vom Broker erzeugt; Clients duerfen keine eigenen Topics nutzen.",
+          "isCorrect": false,
+          "rationale": "Clients publizieren und abonnieren Topics frei nach Konventionen des Systems."
+        }
+      ],
+      "explanationShort": "Topics sind hierarchische Kanalnamen zur Nachrichtenverteilung."
+    },
+    {
+      "id": "mqtt-004",
+      "difficulty": "medium",
+      "question": "Welche Wildcard ersetzt in einem MQTT-Topic-Filter genau eine Ebene?",
+      "hint": "Vergleiche Single-Level und Multi-Level Wildcard.",
+      "answerOptions": [
+        {
+          "text": "+",
+          "isCorrect": true,
+          "rationale": "+ ist die Single-Level-Wildcard und ersetzt genau eine Topic-Ebene."
+        },
+        {
+          "text": "#",
+          "isCorrect": false,
+          "rationale": "# ist die Multi-Level-Wildcard und deckt alle folgenden Ebenen ab."
+        },
+        {
+          "text": "*",
+          "isCorrect": false,
+          "rationale": "* ist in MQTT keine gueltige Wildcard fuer Topic-Filter."
+        },
+        {
+          "text": "&",
+          "isCorrect": false,
+          "rationale": "& hat in MQTT-Topic-Filtern keine Sonderbedeutung."
+        }
+      ],
+      "explanationShort": "+ steht fuer genau eine Ebene, # fuer beliebig viele Ebenen."
+    },
+    {
+      "id": "mqtt-005",
+      "difficulty": "medium",
+      "question": "Was garantiert die Qualitaetsstufe QoS 1?",
+      "hint": "Denke an Zustellgarantie versus Duplikate.",
+      "answerOptions": [
+        {
+          "text": "Die Nachricht wird maximal einmal zugestellt.",
+          "isCorrect": false,
+          "rationale": "Das entspricht QoS 0 (at most once)."
+        },
+        {
+          "text": "Die Nachricht wird mindestens einmal zugestellt, Duplikate sind moeglich.",
+          "isCorrect": true,
+          "rationale": "QoS 1 garantiert Zustellung, akzeptiert aber moegliche Mehrfachzustellung."
+        },
+        {
+          "text": "Die Nachricht wird exakt einmal zugestellt, ohne Duplikate.",
+          "isCorrect": false,
+          "rationale": "Das ist QoS 2 (exactly once)."
+        },
+        {
+          "text": "Die Nachricht kommt nur an, wenn der Empfaenger online ist.",
+          "isCorrect": false,
+          "rationale": "Das ist keine QoS-1-Garantie, sondern haengt von Session/Persistenz ab."
+        }
+      ],
+      "explanationShort": "QoS 1 bedeutet mindestens einmal, aber eventuell mehrfach."
+    },
+    {
+      "id": "mqtt-006",
+      "difficulty": "medium",
+      "question": "Was ist der zentrale Vorteil von Retained Messages?",
+      "hint": "Denke an neue Subscriber, die sofort einen aktuellen Zustand brauchen.",
+      "answerOptions": [
+        {
+          "text": "Sie verhindern generell Duplikate bei jeder QoS-Stufe.",
+          "isCorrect": false,
+          "rationale": "Duplikatverhalten wird durch QoS bestimmt, nicht durch Retain."
+        },
+        {
+          "text": "Neue Subscriber erhalten direkt den zuletzt gespeicherten Wert eines Topics.",
+          "isCorrect": true,
+          "rationale": "Der Broker speichert die letzte Retained-Nachricht und liefert sie beim Abo sofort aus."
+        },
+        {
+          "text": "Retained Messages komprimieren Datenpakete automatisch.",
+          "isCorrect": false,
+          "rationale": "Retain veraendert Verfuegbarkeit, nicht Komprimierung."
+        },
+        {
+          "text": "Retain ersetzt die Notwendigkeit von Authentifizierung.",
+          "isCorrect": false,
+          "rationale": "Sicherheit und Retain sind getrennte Konzepte."
+        }
+      ],
+      "explanationShort": "Retained Messages liefern neuen Abonnenten sofort den letzten bekannten Zustand."
+    },
+    {
+      "id": "mqtt-007",
+      "difficulty": "medium",
+      "question": "Wozu dient ein Last Will Testament (LWT) in MQTT?",
+      "hint": "Betrachte den Fall eines unerwarteten Verbindungsabbruchs.",
+      "answerOptions": [
+        {
+          "text": "Es speichert dauerhaft die letzte Messung im Broker.",
+          "isCorrect": false,
+          "rationale": "Das ist eher die Aufgabe von Retained Messages, nicht von LWT."
+        },
+        {
+          "text": "Es sendet eine vordefinierte Nachricht, wenn ein Client unerwartet offline geht.",
+          "isCorrect": true,
+          "rationale": "LWT informiert andere Teilnehmer ueber einen unkontrollierten Abbruch."
+        },
+        {
+          "text": "Es verschluesselt Zugangsdaten fuer eine sichere Verbindung.",
+          "isCorrect": false,
+          "rationale": "Verschluesselung ist Aufgabe von TLS und Authentifizierungsmechanismen."
+        },
+        {
+          "text": "Es loescht alle Subscriptions bei normalem Disconnect.",
+          "isCorrect": false,
+          "rationale": "LWT ist fuer unerwartete Trennungen gedacht, nicht fuer normale Abmeldungen."
+        }
+      ],
+      "explanationShort": "LWT signalisiert anderen Clients unerwartete Ausfaelle eines Teilnehmers."
+    },
+    {
+      "id": "mqtt-008",
+      "difficulty": "hard",
+      "question": "Welche Kombination beschreibt Keep Alive und Persistent Session korrekt?",
+      "hint": "Trenne Verbindungsueberwachung von Nachrichtenpufferung.",
+      "answerOptions": [
+        {
+          "text": "Keep Alive speichert verpasste Nachrichten; Persistent Session prueft nur die Verbindung.",
+          "isCorrect": false,
+          "rationale": "Die Rollen sind genau umgekehrt."
+        },
+        {
+          "text": "Keep Alive prueft, ob die Verbindung lebt; Persistent Session bewahrt Abos und wartende Nachrichten fuer Offline-Zeiten.",
+          "isCorrect": true,
+          "rationale": "Keep Alive erkennt tote Verbindungen, Session-Persistenz haelt den Kommunikationszustand."
+        },
+        {
+          "text": "Beide Mechanismen regeln nur Verschluesselung und Zertifikate.",
+          "isCorrect": false,
+          "rationale": "Sicherheitsmechanismen sind ein anderes Thema als Keep Alive/Session."
+        },
+        {
+          "text": "Beide Mechanismen sind nur fuer Publisher relevant, nicht fuer Subscriber.",
+          "isCorrect": false,
+          "rationale": "Vor allem Subscriber profitieren von gespeicherten Abos und wartenden Nachrichten."
+        }
+      ],
+      "explanationShort": "Keep Alive ueberwacht Verbindungen; Persistent Session bewahrt Kommunikationszustand."
+    },
+    {
+      "id": "mqtt-009",
+      "difficulty": "hard",
+      "question": "Ein Temperatursensor sendet nach factory/line1/temp. Ein Monitoring-System soll Temperaturen aller Linien erhalten. Welcher Topic-Filter ist passend?",
+      "hint": "Es gibt genau eine variable Ebene zwischen factory und temp.",
+      "answerOptions": [
+        {
+          "text": "factory/#/temp",
+          "isCorrect": false,
+          "rationale": "# darf nur als letzte Ebene verwendet werden; dieser Filter ist ungueltig."
+        },
+        {
+          "text": "factory/+/temp",
+          "isCorrect": true,
+          "rationale": "+ ersetzt genau eine Ebene und passt fuer line1, line2, line3 usw."
+        },
+        {
+          "text": "factory/temp",
+          "isCorrect": false,
+          "rationale": "Die mittlere Ebene (z. B. line1) fehlt im Filter."
+        },
+        {
+          "text": "+/factory/temp",
+          "isCorrect": false,
+          "rationale": "Die Reihenfolge der Ebenen ist falsch und passt nicht zum Topic-Schema."
+        }
+      ],
+      "explanationShort": "factory/+/temp erfasst alle Linien bei fixer erster und letzter Ebene."
+    },
+    {
+      "id": "mqtt-010",
+      "difficulty": "hard",
+      "question": "Ein Dashboard zeigt nach Neustart keinen letzten Temperaturwert, obwohl Sensoren regelmaessig senden. Welche Ursache ist am wahrscheinlichsten?",
+      "hint": "Denke an den Erstzustand fuer neue Subscriber.",
+      "answerOptions": [
+        {
+          "text": "Nachrichten werden ohne Retain-Flag gesendet, daher liegt fuer neue Subscriber kein gespeicherter letzter Wert vor.",
+          "isCorrect": true,
+          "rationale": "Ohne Retained Message erhalten neue Clients erst Daten beim naechsten Publish."
+        },
+        {
+          "text": "QoS 1 blockiert die Zustellung an neu verbundene Clients grundsaetzlich.",
+          "isCorrect": false,
+          "rationale": "QoS 1 blockiert nicht, sondern regelt die Zustellgarantie mit moeglichen Duplikaten."
+        },
+        {
+          "text": "LWT deaktiviert automatisch Retained Messages im gesamten Broker.",
+          "isCorrect": false,
+          "rationale": "LWT und Retain sind unabhaengige MQTT-Features."
+        },
+        {
+          "text": "Der Broker darf bei MQTT keine gespeicherten Nachrichten an neue Subscriber senden.",
+          "isCorrect": false,
+          "rationale": "Genau dafuer sind Retained Messages vorgesehen."
+        }
+      ],
+      "explanationShort": "Ohne Retain bekommt ein neu gestarteter Client den letzten Zustand nicht sofort."
+    }
+  ]
+}
